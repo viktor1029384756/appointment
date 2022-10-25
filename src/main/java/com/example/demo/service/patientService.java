@@ -4,10 +4,7 @@ import com.example.demo.entity.Appointment;
 import com.example.demo.entity.Department;
 import com.example.demo.entity.Doctor;
 import com.example.demo.entity.Patient;
-import com.example.demo.entity.exceptions.DepartmentDoesentExist;
-import com.example.demo.entity.exceptions.DoktorDoesentExists;
-import com.example.demo.entity.exceptions.PatientDoesentExist;
-import com.example.demo.entity.exceptions.TerminVekjePostoi;
+import com.example.demo.entity.exceptions.*;
 import com.example.demo.repository.appointmentRepository;
 import com.example.demo.repository.departmentRepository;
 import com.example.demo.repository.doctorRepository;
@@ -17,6 +14,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
 import javax.xml.crypto.Data;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Service
@@ -103,12 +102,69 @@ public class patientService {
         throw new PatientDoesentExist("Ne postoi takov pacient.");
     }
 
+    public void CheckValidDate(String date1){
+        LocalDate dateObj = LocalDate.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("MM-dd-yyyy");
+        String date = dateObj.format(formatter);
+
+
+        //Ova e date1 od bazata
+        int month1 = Integer.parseInt(String.valueOf(date1.substring(0,2)));
+        int day1 = Integer.parseInt(String.valueOf(date1.substring(3,5)));
+        int year1 = Integer.parseInt(String.valueOf(date1.substring(6,date1.length())));
+
+        //Ova e za vremeto localno
+        int month_local = Integer.parseInt(String.valueOf(date.substring(0,2)));
+        int day_local = Integer.parseInt(String.valueOf(date.substring(3,5)));
+        int year_local = Integer.parseInt(String.valueOf(date.substring(6,date1.length())));
+
+
+        //Proveri dali e pominat denot
+        if (day_local > day1 || month_local > month1){
+            //System.out.println("Pominat termin.");
+            throw new ValidDateException("The current day/month is expired.");
+        }
+
+        //Proveri dali e pominata godinata
+        if (year_local > year1){
+            throw new ValidDateException("The current year is expired.");
+        }
+    }
+
+    //Za da proveri dali se validni saatite.
+    public void CheckHour(String fHour,String tHour){
+        String a = String.valueOf(fHour.substring(0,2));
+        String a1 = String.valueOf(tHour.substring(0,2));
+
+        String b = String.valueOf(fHour.substring(3,5));
+        String b2 = String.valueOf(tHour.substring(3,5));
+
+        int brojce_a = Integer.parseInt(a);
+        int brojce_a1 = Integer.parseInt(a1);
+
+        int brojce = Integer.parseInt(b);
+        int brojce1 = Integer.parseInt(b2);
+
+        if (brojce_a > brojce_a1){
+            System.out.println(brojce_a);
+            throw new ValidHourException("Enter valid time1.");
+        }
+        if (brojce > brojce1){
+            System.out.println(brojce);
+            throw new ValidHourException("Enter valid time2.");
+        }
+    }
+
     //Da zakaze termin sam ili da se javi i da mu zakaze nekoj od working staff
     public void zakaziTermin(String datum, String fHour, String tHour, int doctor_id, int patient_id) {
         Patient patient = patientRepo.findById(patient_id).orElse(null);
         Doctor doctor = doctorRepo.findById(doctor_id).orElse(null);
         List<Appointment> appointments = appRepo.findAll();
         Appointment appointment = new Appointment(datum, fHour, tHour, doctor, patient);
+
+        //Proveri dali fHour e pogolemo od tHour ako e togas frli isklucok.
+        CheckHour(fHour,tHour);
+        //CheckValidDate(datum);
 
         if (appointments.isEmpty()) {
             appRepo.save(appointment);
@@ -126,7 +182,7 @@ public class patientService {
                 }
             }
         }
-        System.out.println("Zacuvaj !!!!");
+        appRepo.save(appointment);
     }
 
     //Moze da se modifikuva termin samo ako e dva dena pred vreme.
@@ -135,6 +191,9 @@ public class patientService {
 
         List<Appointment> appointments = appRepo.findAll();
         Appointment appointment = appRepo.findById(id).orElse(null);
+
+        CheckValidDate(date);
+        CheckHour(newFromH,newToHour);
 
         for (Appointment appointment1 : appointments){
             if (appointment1.getDate().equals(date)){
